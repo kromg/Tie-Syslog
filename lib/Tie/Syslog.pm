@@ -1,8 +1,58 @@
 package Tie::Syslog;
 
+our $VERSION = '0.00_02';
+
 use 5.006;
 use strict;
 use warnings;
+use Carp qw/confess/;
+# Define all default handle-tying subs, so that they can be autoloaded if 
+# necessary.
+use subs qw(
+    TIEHANDLE
+    WRITE
+    PRINT
+    PRINTF
+    READ
+    READLINE
+    GETC
+    CLOSE
+    OPEN
+    BINMODE
+    EOF
+    TELL
+    SEEK
+);
+
+# ------------------------------------------------------------------------------
+# Handle tying methods - see 'perldoc perltie' and 'perldoc Tie::Handle'
+# ------------------------------------------------------------------------------
+
+# Provide a graceful fallback for not-yet-implemented methods
+sub AUTOLOAD {
+    my $self = shift;
+    my $name = (split '::', our $AUTOLOAD)[-1];
+    return if $name eq 'DESTORY';
+
+    my $err = "$name operation not (yet?) supported";
+
+    # See if errors are fatals
+    my $errors_are_fatals = ref($self) ? $self->{'errors_are_fatals'} : 1;
+    confess $err if $errors_are_fatals;
+
+    # Install a handler for this operation if errors are nonfatal
+    {
+        no strict 'refs';
+        *$name = sub {
+            print "$name operation not (yet?) supported";
+        }
+    }
+
+    $self->$name;
+}
+
+1; # End of Tie::Syslog
+__END__
 
 =head1 NAME
 
@@ -10,11 +60,7 @@ Tie::Syslog - The great new Tie::Syslog!
 
 =head1 VERSION
 
-Version 0.00_01
-
-=cut
-
-our $VERSION = '0.00_01';
+Version 0.00_02
 
 
 =head1 SYNOPSIS
@@ -37,17 +83,9 @@ if you don't export anything, such as for a purely object-oriented module.
 
 =head2 function1
 
-=cut
-
-sub function1 {
-}
 
 =head2 function2
 
-=cut
-
-sub function2 {
-}
 
 =head1 AUTHOR
 
@@ -108,4 +146,4 @@ See http://dev.perl.org/licenses/ for more information.
 
 =cut
 
-1; # End of Tie::Syslog
+
