@@ -1,11 +1,11 @@
 package Tie::Syslog;
 
-our $VERSION = '0.00_02';
+our $VERSION = '0.00_03';
 
 use 5.006;
 use strict;
 use warnings;
-use Carp qw/confess/;
+use Carp qw/croak confess/;
 # Define all default handle-tying subs, so that they can be autoloaded if 
 # necessary.
 use subs qw(
@@ -28,11 +28,31 @@ use subs qw(
 # Handle tying methods - see 'perldoc perltie' and 'perldoc Tie::Handle'
 # ------------------------------------------------------------------------------
 
+sub TIEHANDLE {
+    # Provide a copy-constructor - if called with an object reference instead of 
+    # a class name, then clone the given invocant
+    my $pkg = shift;
+    
+    # Wrong initialization 
+    croak "Odd number of elements in hash options"
+        if @_ % 2;
+
+    # Copy invocant if it's an object, overwrite its config with the one provided
+    my $class; 
+       $class = ref $pkg && 
+        return bless {%$pkg, @_}, $class;
+    
+    # Build a new object if called as class method:
+    bless { @_ }, $pkg;
+}
+
+# ------------------------------------------------------------------------------
 # Provide a graceful fallback for not-yet-implemented methods
+# ------------------------------------------------------------------------------
 sub AUTOLOAD {
     my $self = shift;
     my $name = (split '::', our $AUTOLOAD)[-1];
-    return if $name eq 'DESTORY';
+    return if $name eq 'DESTROY';
 
     my $err = "$name operation not (yet?) supported";
 
@@ -60,7 +80,7 @@ Tie::Syslog - The great new Tie::Syslog!
 
 =head1 VERSION
 
-Version 0.00_02
+Version 0.00_03
 
 
 =head1 SYNOPSIS
