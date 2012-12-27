@@ -1,11 +1,11 @@
 package Tie::Syslog;
 
-our $VERSION = '0.00_04';
+our $VERSION = '0.00_05';
 
 use 5.006;
 use strict;
 use warnings;
-use Carp qw/croak confess/;
+use Carp qw/carp croak confess/;
 use Sys::Syslog qw/:standard :macros/;
 # Define all default handle-tying subs, so that they can be autoloaded if 
 # necessary.
@@ -28,30 +28,53 @@ use subs qw(
 );
 
 # 'Globals'
-my @openlog_opts = ('ident', 'logopt', 'facility');
+my @openlog_opts   = ('ident', 'logopt', 'facility');
+my @mandatory_opts = (@openlog_opts, 'priority');
 my %open_handles;
+
+# ------------------------------------------------------------------------------
+# 'Private' functions and methods
+# ------------------------------------------------------------------------------
+sub _connected() {
+    return $Sys::Syslog::connected;
+}
+
+sub _check_params {
+    # Wrong number of parameters in initialization
+    croak "Odd number of elements in Tie","::","Syslog hash options"
+        if @_ % 2;
+}
 
 # ------------------------------------------------------------------------------
 # Handle tying methods - see 'perldoc perltie' and 'perldoc Tie::Handle'
 # ------------------------------------------------------------------------------
 
 sub TIEHANDLE {
-    my $pkg = shift;
-
-    # Die if called as an instance method:
-    croak "Wrong initialization: not an instance method" 
-        if ref($pkg); 
+    my ($pkg, $self);
+    if (my $ref = ref($_[0])) {
+        # Use a copy-constructor, providing support for 
+        # single-parameter-override via the @_
+        $pkg = $ref;
+        my $prototype = shift;
+        _check_params @_;
+        $self = bless {
+                %$prototype, 
+                @_,
+                is_open => 0,
+            }, $pkg;
+    } else {
+        # Called as an instance class
+        $pkg = shift;
     
-    # Wrong initialization 
-    croak "Odd number of elements in hash options"
-        if @_ % 2;
+        _check_params @_;
 
-    my $self = bless { @_ }, $pkg;
+        $self = bless { @_ }, $pkg;
 
-    # Wrong initialization
-    for (@openlog_opts, 'priority') {
-        croak "You must provide values for '$_' option"
-            unless $self->{$_};
+        # Wrong initialization
+        for (@openlog_opts, 'priority') {
+            croak "You must provide values for '$_' option"
+                unless $self->{$_};
+        }
     }
 
     # Now openlog() if needed, by calling our own open()
@@ -67,7 +90,7 @@ sub OPEN {
     # got from initialization
     # openlog() croaks if it can't get a connection, so there is no need to 
     # check for errors
-    openlog(@self->{@openlog_opts}) 
+    openlog(@{$self}{@openlog_opts}) 
         unless _connected;
     # CLOSE will call closelog() only when there are no more open tied handles.
     $open_handles{$self} = 1;
@@ -76,19 +99,23 @@ sub OPEN {
 
 sub CLOSE {
     my $self = shift;
+    return 1 unless $self->{'is_open'};
     delete $open_handles{$self};
+    $self->{'is_open'} = 0;
     return scalar(keys(%open_handles)) ? 1 : closelog();
 }
 
 sub PRINT {
     my $self = shift;
+    carp "Cannot PRINT to a closed filehandle!" unless $self->{'is_open'};
     syslog $self->{'priority'}, @_;
 }
 
-sub PRINTf {
+sub PRINTF {
     my $self = shift;
+    carp "Cannot PRINTF to a closed filehandle!" unless $self->{'is_open'};
     my $format = shift;
-    syslog $self->{'priority'}, $format, $_;
+    syslog $self->{'priority'}, $format, @_;
 }
 
 
@@ -105,16 +132,22 @@ sub FILENO {
                                        undef;
 }
 
-
-# ------------------------------------------------------------------------------
-# 'Private' methods
-# ------------------------------------------------------------------------------
-sub _connected() {
-    return $Sys::Syslog::connected;
+sub DESTROY {
+    my $self = shift;
+    return 1 unless $self;
+    $self->CLOSE();
+    undef $self;
 }
 
+sub UNTIE {
+    my $self = shift;
+    return 1 unless $self;
+    $self->DESTROY;
+}
+
+
 # ------------------------------------------------------------------------------
-# Provide a graceful fallback for not-yet-implemented methods
+# Provide a graceful fallback for not(-yet?)-implemented methods
 # ------------------------------------------------------------------------------
 sub AUTOLOAD {
     my $self = shift;
@@ -124,8 +157,8 @@ sub AUTOLOAD {
     my $err = "$name operation not (yet?) supported";
 
     # See if errors are fatals
-    my $errors_are_fatals = ref($self) ? $self->{'errors_are_fatals'} : 1;
-    confess $err if $errors_are_fatals;
+    my $errors_are_fatal = ref($self) ? $self->{'errors_are_fatal'} : 1;
+    confess $err if $errors_are_fatal;
 
     # Install a handler for this operation if errors are nonfatal
     {
@@ -147,7 +180,7 @@ Tie::Syslog - The great new Tie::Syslog!
 
 =head1 VERSION
 
-Version 0.00_04
+Version 0.00_05
 
 
 =head1 SYNOPSIS
