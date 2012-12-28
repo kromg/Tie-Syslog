@@ -1,6 +1,6 @@
 package Tie::Syslog;
 
-our $VERSION = '2.00_08';
+our $VERSION = '2.00_09';
 
 use 5.006;
 use strict;
@@ -165,6 +165,17 @@ sub PRINTF {
         if $@;
 }
 
+# Provide a fallback method for write
+sub WRITE {
+    my $self = shift;
+    my $string = shift;
+    my $length = shift || length $string;
+    my $offset = shift; # Ignored
+
+    $self->PRINT substr($string, 0, $length);
+
+    return $length;
+}
 
 # This peeks a little into Sys:Syslog internals, so it might break sooner or 
 # later. Expect this to happen. 

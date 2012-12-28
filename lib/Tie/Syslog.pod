@@ -7,7 +7,7 @@ Tie::Syslog - Tie a filehandle to Syslog.
 
 =head1 VERSION
 
-2.00_08
+2.00_09
 
 
 =head1 SYNOPSIS
