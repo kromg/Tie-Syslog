@@ -1,6 +1,6 @@
 package Tie::Syslog;
 
-our $VERSION = '0.00_07';
+our $VERSION = '2.00_08';
 
 use 5.006;
 use strict;
@@ -29,11 +29,11 @@ use subs qw(
 
 # 'Public Globals'
 $Tie::Syslog::ident = (split '/', $0)[-1];
+$Tie::Syslog::logopt = 'pid,ndelay';
 
 # 'Private Globals'
-my @openlog_opts   = ('ident', 'logopt', 'facility');
-my @mandatory_opts = (@openlog_opts, 'priority');
-my %open_handles;
+my @mandatory_opts = ('facility', 'priority');
+my %open_connections;
 
 # ------------------------------------------------------------------------------
 # 'Private' functions
@@ -48,16 +48,14 @@ sub _get_params {
         # Copy values so we don't risk changing an existing reference
         $params = { 
             %{ shift() },
-            ident => $Tie::Syslog::ident,
         };
     } else {
-        my ($facility, $priority) = split '\.', $_[0];
-        $Tie::Syslog::ident = $_[1] if $_[1];
+        my ($facility, $priority) = split '\.', shift;
+        $Tie::Syslog::ident  = shift if @_;
+        $Tie::Syslog::logopt = ( join ',' => @_) if @_;
         $params = {
             facility => $facility,
             priority => $priority,
-            logopt   => ( join ',' => @_[2..$#_] ),
-            ident    => $Tie::Syslog::ident,
         };
     }
 
@@ -70,12 +68,6 @@ sub _get_params {
     }
 
     return $params;
-}
-
-sub _is_open {
-    my ($facility, $priority, $define_it) = @_;
-    $open_handles{$facility}{$priority} = 1 if $define_it;
-    return $open_handles{$facility}{$priority};
 }
 
 # ------------------------------------------------------------------------------
@@ -117,7 +109,7 @@ sub TIEHANDLE {
 
         # Wrong initialization
         for (@mandatory_opts) {
-            croak "You must provide values for '$_' option"
+            croak "You must provide value for '$_' option"
                 unless $self->{$_};
         }
     }
@@ -131,14 +123,17 @@ sub TIEHANDLE {
 
 sub OPEN {
     my $self = shift;
+    my $f = $self->facility;
     # Ignore any parameter passed, since we just call openlog() with parameters
     # got from initialization
-    # openlog() croaks if it can't get a connection, so there is no need to 
-    # check for errors
-    openlog(@{$self}{@openlog_opts})
-        unless _is_open($self->facility, $self->priority);
-    $self->{'is_open'} = 1;
-    return _is_open($self->facility, $self->priority, 1);
+    eval { 
+        openlog($Tie::Syslog::ident, $Tie::Syslog::logopt, $self->facility)
+            unless $open_connections{ $f };
+    };
+    croak "openlog() failed with errors: $@"
+        if $@;
+    $open_connections{ $f } = 1;
+    return $self->{'is_open'} = 1;
 }
 
 # Stub - since we can have multiple facility/priority pairs, we could have many
