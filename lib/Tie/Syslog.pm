@@ -1,6 +1,6 @@
 package Tie::Syslog;
 
-our $VERSION = '0.00_06';
+our $VERSION = '0.00_07';
 
 use 5.006;
 use strict;
@@ -27,7 +27,10 @@ use subs qw(
     FILENO
 );
 
-# 'Globals'
+# 'Public Globals'
+$Tie::Syslog::ident = (split '/', $0)[-1];
+
+# 'Private Globals'
 my @openlog_opts   = ('ident', 'logopt', 'facility');
 my @mandatory_opts = (@openlog_opts, 'priority');
 my %open_handles;
@@ -35,14 +38,44 @@ my %open_handles;
 # ------------------------------------------------------------------------------
 # 'Private' functions
 # ------------------------------------------------------------------------------
-sub _connected() {
-    return $Sys::Syslog::connected;
+
+sub _get_params {
+
+    my $params;
+
+    if (ref($_[0]) eq 'HASH') {
+        # New-style configuration 
+        # Copy values so we don't risk changing an existing reference
+        $params = { 
+            %{ shift() },
+            ident => $Tie::Syslog::ident,
+        };
+    } else {
+        my ($facility, $priority) = split '\.', $_[0];
+        $Tie::Syslog::ident = $_[1] if $_[1];
+        $params = {
+            facility => $facility,
+            priority => $priority,
+            logopt   => ( join ',' => @_[2..$#_] ),
+            ident    => $Tie::Syslog::ident,
+        };
+    }
+
+    # Normalize names
+    for ('facility', 'priority') {
+        next unless $params->{ $_ };
+        $params->{ $_ } = uc( $params->{ $_ } );
+        $params->{ $_ } = 'LOG_' . $params->{ $_ }
+            unless $params->{ $_ } =~ /^LOG_/;
+    }
+
+    return $params;
 }
 
-sub _check_params {
-    # Wrong number of parameters in initialization
-    croak "Odd number of elements in Tie","::","Syslog hash options"
-        if @_ % 2;
+sub _is_open {
+    my ($facility, $priority, $define_it) = @_;
+    $open_handles{$facility}{$priority} = 1 if $define_it;
+    return $open_handles{$facility}{$priority};
 }
 
 # ------------------------------------------------------------------------------
@@ -69,22 +102,21 @@ sub TIEHANDLE {
         # single-parameter-override via the @_
         $pkg = $ref;
         my $prototype = shift;
-        _check_params @_;
+        my $other_parameters = _get_params @_;
         $self = bless {
                 %$prototype, 
-                @_,
-                is_open => 0,
+                %$other_parameters,
             }, $pkg;
     } else {
-        # Called as an instance class
+        # Called as a class method
         $pkg = shift;
     
-        _check_params @_;
+        my $parameters = _get_params @_;
 
-        $self = bless { @_ }, $pkg;
+        $self = bless $parameters, $pkg;
 
         # Wrong initialization
-        for (@openlog_opts, 'priority') {
+        for (@mandatory_opts) {
             croak "You must provide values for '$_' option"
                 unless $self->{$_};
         }
@@ -103,19 +135,19 @@ sub OPEN {
     # got from initialization
     # openlog() croaks if it can't get a connection, so there is no need to 
     # check for errors
-    openlog(@{$self}{@openlog_opts}) 
-        unless _connected;
-    # CLOSE will call closelog() only when there are no more open tied handles.
-    $open_handles{$self} = 1;
-    return $self->{'is_open'} = 1;
+    openlog(@{$self}{@openlog_opts})
+        unless _is_open($self->facility, $self->priority);
+    $self->{'is_open'} = 1;
+    return _is_open($self->facility, $self->priority, 1);
 }
 
+# Stub - since we can have multiple facility/priority pairs, we could have many
+# connections (in general); since Sys::Syslog does NOT allow user to select 
+# which channel to close, we really have nothing to do here. 
 sub CLOSE {
     my $self = shift;
-    return 1 unless $self->{'is_open'};
-    delete $open_handles{$self};
     $self->{'is_open'} = 0;
-    return scalar(keys(%open_handles)) ? 1 : closelog();
+    return 1;
 }
 
 sub PRINT {
@@ -144,9 +176,7 @@ sub PRINTF {
 #   undef otherwise
 sub FILENO {
     my $fd = fileno(*Sys::Syslog::SYSLOG);
-    return              defined($fd) ? $fd  :
-             $Sys::Syslog::connected ?  -1  :
-                                       undef;
+    return defined($fd) ? $fd  : -1;
 }
 
 sub DESTROY {
@@ -186,6 +216,15 @@ sub AUTOLOAD {
     }
 
     $self->$name;
+}
+
+
+# ------------------------------------------------------------------------------
+# Compatibility with previous module
+# ------------------------------------------------------------------------------
+# die() and warn() print to STDERR
+sub ExtendedSTDERR {
+    return 1;
 }
 
 'End of Tie::Syslog'

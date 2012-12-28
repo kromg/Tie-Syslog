@@ -7,19 +7,21 @@ Tie::Syslog - Tie a filehandle to Syslog.
 
 =head1 VERSION
 
-Version 0.00_06
+Version 0.00_07
 
 
 =head1 SYNOPSIS
 
     use Tie::Syslog;
 
+    $Tie::Syslog::ident = "my logging tag";
+
     # Tie STDOUT to Syslog, so that every print()ed message will be logged
-    tie *STDOUT, 'Tie::Syslog', 
-        ident    => 'myname',
+    tie *STDOUT, 'Tie::Syslog', {
         logopt   => 'pid,ndelay',
         facility => 'LOG_LOCAL0',
-        priority => 'LOG_INFO';         # this ends with ';'
+        priority => 'LOG_INFO',
+    };
 
     # Now tie STDERR also, getting parameters from the tied STDOUT
     tie *STDERR, { tied *STDOUT };
@@ -27,12 +29,80 @@ Version 0.00_06
     # ...or...
 
     # tie STDERR with defaults from tied STDOUT, but override priority:
-    tie *STDERR, { tied *STDOUT },
-        priority => 'LOG_ERR';
+    tie *STDERR, { tied *STDOUT }, {
+        priority => 'LOG_ERR',
+    }
+
+    ###### 
+    # Compatibility with old configuration style:
+
+    tie *STDOUT, 'Tie::Syslog', 
+        'local0.error',         # facility.loglevel
+        'myname',               # identity 
+        'pid',                  # Other Sys::Syslog options, comma-separated
+        'ndelay';
+
+    # Tying by copying from another tied handle is not supported in 
+    # old-compatibility-mode
 
 =head1 DESCRIPTION
 
+This module lets you tie a filehandle to Sys::Syslog, providing an easy way to
+recirect messages to system logs. 
 
+    tie *DEBUG, 'Tie::Syslog', {
+        facility => 'LOG_LOCAL0',
+        priority => 'LOG_DEBUG',
+        ident    => 'DEBUG :: myprocess',
+        logopt   => 'pid,ndelay',
+    };
+
+    print DEBUG "This is a debug message - won't probably get to system logs.";
+
+By tying STDOUT and/or STDERR you can easily redirect all messages to system
+logs, including those of warn() and die(). 
+
+Tipically, you\ll want to tie STDOUT with a lower priority than STDERR. 
+
+
+=head1 OPTIONS
+
+=head2 facility
+
+One of the default Sys::Syslog facilities available on your system. See L<<
+Sys::Syslog >> man page for details.
+
+=head2 ident
+
+Identity set for logging. B<< This is a global option >>: if you redefine it, it
+will be used for other tied handles as well. 
+
+=head2 logopt
+
+Logging options. These are standard L<< Sys::Syslog >> logopts. See  L<<
+Sys::Syslog >> man page for details.
+
+=head2 priority
+
+One of the default Sys::Syslog priorities available on your system. See L<<
+Sys::Syslog >> man page for details.
+
+
+=head1 CAVEATS
+
+=over 4
+
+=item * B<< C<< ident >> is a global option >>. 
+If you redefine it, the new
+setting will impact all other tied filehandles as well (assuming you have more
+than one of them). 
+
+=back 
+
+
+=head1 SEE ALSO
+
+Log priorities, facilities and valid values for C<< logopt >> are listed in L<< Sys::Syslog >> man page. 
 
 
 =head1 AUTHOR
