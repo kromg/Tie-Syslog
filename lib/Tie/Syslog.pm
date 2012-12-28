@@ -1,6 +1,6 @@
 package Tie::Syslog;
 
-our $VERSION = '2.00_09';
+our $VERSION = '2.00_09a';
 
 use 5.006;
 use strict;
@@ -172,7 +172,7 @@ sub WRITE {
     my $length = shift || length $string;
     my $offset = shift; # Ignored
 
-    $self->PRINT substr($string, 0, $length);
+    $self->PRINT(substr($string, 0, $length));
 
     return $length;
 }
