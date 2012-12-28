@@ -125,6 +125,11 @@ best, nothing should change; or settings could change if another openlog()
 is called afterwards, but don't rely on this. Also, if settings change, they
 will affect all tied filehandles. Set them once at the beginning. 
 
+=item * Old method C<< ExtendedSTDERR() >> is no-op by default. 
+
+It is still supported for backward compatibility, but warn() and die() print by
+default to STDERR so there should be no need to change them directly. 
+
 
 =back 
 

@@ -2,27 +2,29 @@
 
 use Test::More tests => 3;
 use Tie::Syslog;
+no warnings qw(once);
 
 $Tie::Syslog::ident  = 'Tie::Syslog newstyle test';
 $Tie::Syslog::logopt = 'pid,ndelay';
 
-ok(
-    ! do {
-        tie *FAIL, "Tie::Syslog", {};
-    }, "Tying failure"
-);
+eval {
+    tie *FAIL, "Tie::Syslog", {};
+};
 
-ok (
-    do { 
-        tie *TEST, "Tie::Syslog", {
-            'priority' => 'LOG_DEBUG',
-            'facility' => 'LOG_LOCAL0',
-        };
-    }, "Tying test" 
-);
+ok( $@, "Parameters check" );
 
-ok (
-    do { print TEST "Built!" }, 
-    "Print test"
-);
+eval {
+    tie *TEST, "Tie::Syslog", {
+        'priority' => 'LOG_DEBUG',
+        'facility' => 'LOG_LOCAL0',
+    };
+};
+
+ok ( ! $@, "Tying test ($@)" );
+
+eval {
+    print TEST "Built!";
+};
+
+ok ( ! $@, "Print test ($@)" );
 

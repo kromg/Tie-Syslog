@@ -50,7 +50,7 @@ sub _get_params {
             %{ shift() },
         };
     } else {
-        my ($facility, $priority) = split '\.', shift;
+        my ($facility, $priority) = @_ ? split '\.', shift : ('LOG_LOCAL0', 'LOG_ERR');
         $Tie::Syslog::ident  = shift if @_;
         $Tie::Syslog::logopt = ( join ',' => @_) if @_;
         $params = {
@@ -62,8 +62,11 @@ sub _get_params {
     # Normalize names
     for ('facility', 'priority') {
         next unless $params->{ $_ };
-        $params->{ $_ } = uc( $params->{ $_ } );
-        $params->{ $_ } = 'LOG_' . $params->{ $_ }
+        $params->{ $_ } =  uc( $params->{ $_ } );
+        $params->{ $_ } =~ s/EMERGENCY/EMERG/;
+        $params->{ $_ } =~ s/ERROR/ERR/;
+        $params->{ $_ } =~ s/CRITICAL/CRIT/;
+        $params->{ $_ } =  'LOG_' . $params->{ $_ }
             unless $params->{ $_ } =~ /^LOG_/;
     }
 
