@@ -101,7 +101,7 @@ is 'pid,ndelay'.
 One of the default Sys::Syslog facilities available on your system. See L<<
 Sys::Syslog >> man page for details. You can have different facilities for
 different filehandles, but this is not recommended, and will prevent 
-Tie::Syslog from calling closelog() (see L<< CAVEATS >> for details).
+Tie::Syslog from calling closelog() (see L<< /CAVEATS >> for details).
 
 You can redefine a the facility for a given filehandle on the fly: 
 
