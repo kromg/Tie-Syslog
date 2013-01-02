@@ -7,7 +7,11 @@ Tie::Syslog - Tie a filehandle to Syslog.
 
 =head1 VERSION
 
-2.00_09
+2.01_01
+
+v2.00 is a complete rewrite of Tie::Syslog. If you used v1.x and something
+broke after upgrade, please report the problem back and I'll try to fix it 
+asap. Thanks.
 
 
 =head1 SYNOPSIS
@@ -32,7 +36,7 @@ Tie::Syslog - Tie a filehandle to Syslog.
     # tie STDERR with defaults from tied STDOUT, but override priority:
     tie *STDERR, { tied *STDOUT }, {
         priority => 'LOG_ERR',
-    }
+    };
 
     ###### 
     # Compatibility with old configuration style:
@@ -40,16 +44,26 @@ Tie::Syslog - Tie a filehandle to Syslog.
     tie *STDOUT, 'Tie::Syslog', 
         'local0.error',         # facility.loglevel
         'myname',               # identity 
-        'pid',                  # Other Sys::Syslog options, comma-separated
-        'ndelay';
+        'pid,ndelay',           # Other Sys::Syslog options, comma-separated
+        'unix';                 # setlogsock socket type: unix or inet
+
+    tie *STDERR, 'Tie::Syslog', 
+        'local0.warning',       # facility.loglevel
+        'myname',               # USE THE SAME AS ABOVE!
+        'pid,ndelay',           # USE THE SAME AS ABOVE!
+        'unix';                 # USE THE SAME AS ABOVE!
 
     # Tying by copying from another tied handle is not supported in 
     # old-compatibility-mode
 
+    # old-compatibility-mode defaults to 'local0.error'
+
+    # socket type is IGNORED
+
 =head1 DESCRIPTION
 
 This module lets you tie a filehandle to Sys::Syslog, providing an easy way to
-recirect messages to system logs. 
+redirect messages to system logs. 
 
 
     $Tie::Syslog::ident  = 'DEBUG :: myprocess';
@@ -79,18 +93,34 @@ split on '/'.
 =head2 $Tie::Syslog::logopt
 
 Logging options. These are standard L<< Sys::Syslog >> logopts. See  L<<
-Sys::Syslog >> man page for details. 
+Sys::Syslog >> man page for details. B<< This is a global option >>, default
+is 'pid,ndelay'.
 
 =head2 facility
 
 One of the default Sys::Syslog facilities available on your system. See L<<
 Sys::Syslog >> man page for details. You can have different facilities for
-different filehandles.
+different filehandles, but this is not recommended, and will prevent 
+Tie::Syslog from calling closelog() (see L<< CAVEATS >> for details).
 
 You can redefine a the facility for a given filehandle on the fly: 
 
     my $fho = tied *MYFH;
     $fho->facility('LOG_MAIL');
+
+    # better: 
+
+    (tied *MYFH)->facility('LOG_MAIL');
+
+    # better yet: don't do it
+
+but please note that this is B<< against Sys::Syslog rule: >>
+
+=over 4
+
+=item * "I<< The Fourth Rule of Sys::Syslog is: >> One facility, one priority." (from L<< Sys::Syslog >> man page).
+
+=back
 
 
 =head2 priority
@@ -104,18 +134,29 @@ You can redefine the priority for a given filehandle on the fly:
     my $fho = tied *MYFH;
     $fho->priority('LOG_CRIT');
 
+    # better: 
+
+    (tied *MYFH)->priority('LOG_CRIT');
+
 
 =head1 CAVEATS
 
 =over 4
 
-=item * B<< We do not call closelog() >>
+=item * We set the most permissive mask for log levels, so that nothing should
+be filtered by Sys::Syslog itself, but some messages may still be filtered,
+according to your syslog daemon configuration. Consult your local syslog daemon
+documentation.
+
+=item * B<< We do not call closelog() >> in case multiple facilities are in use
 
 In general, openlog() is called automatically whenever syslog() is called on a
-new facility/priority pair (although we call it explicitly on tie()). Since
-closelog() would work just once and on the last opened connetion to syslog, it
-could close a connection completely unrelated to the filehandle currently being
-closed/untied/destroyed. So we don't call it at all. 
+new facility (although we call it explicitly on tie()). Since closelog() would 
+work just once and on the last opened connetion to syslog, it could close a 
+connection completely unrelated to the filehandle currently being 
+closed/untied/destroyed. B<< In case you tied multiple filehandles >> over
+multiple faiclities (you shouldn't, see L<< Sys::Syslog >> for details),
+closelog() won't be called at all. 
 
 =item * C<< ident >> and/or C<< logopt >> should be set once, before tying
 handles.
@@ -123,13 +164,23 @@ handles.
 If change these variables after tying handles, the behavior is undetermined. At
 best, nothing should change; or settings could change if another openlog()
 is called afterwards, but don't rely on this. Also, if settings change, they
-will affect all tied filehandles. Set them once at the beginning. 
+will affect all tied filehandles. For these reasons, either: 
+
+=over 4 
+
+=item * Set them once at the beginning, or
+
+=item * if you're tying two or more handles B<< using old-style syntax >>, use
+the same values for all of them.
+
+=back 
 
 =item * Old method C<< ExtendedSTDERR() >> is no-op by default. 
 
 It is still supported for backward compatibility, but warn() and die() print by
 default to STDERR so there should be no need to change them directly. 
 
+=item * We do not call setlogsock() 
 
 =back 
 
@@ -139,19 +190,21 @@ default to STDERR so there should be no need to change them directly.
 Log priorities, facilities and valid values for C<< logopt >> are listed in 
 L<< Sys::Syslog >> man page. 
 
+Read syslog(3) for details on syslog. 
+
 
 =head1 AUTHOR
 
-Broc Seib, C<< bseib at purdue.edu >>
+Broc Seib, C<< bseib at purdue.edu >> - up to 1.07
 
-Giacomo Montagner, C<< <kromg at entirelyunlike.net> >> 
+Giacomo Montagner, C<< <kromg at entirelyunlike.net> >> - from 2.00 onward.
 
 
 =head1 BUGS
 
 Please report any bugs or feature requests to C<bug-tie-syslog at rt.cpan.org>, or through
 the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Tie-Syslog>.  
-We'will be notified, and then you'll
+I'will be notified, and then you'll
 automatically be notified of progress on your bug as I make changes.
 
 
@@ -189,15 +242,18 @@ L<http://search.cpan.org/dist/Tie-Syslog/>
 
 =head1 ACKNOWLEDGEMENTS
 
+Many thanks to Broc Seib, who wrote this module back in 1999. 
+
+
 
 =head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 1999-2001 Broc Seib
+
 Copyright (C) 2012 Giacomo Montagner.
 
-This program is free software; you can redistribute it and/or modify it
-under the terms of either: the GNU General Public License as published
-by the Free Software Foundation; or the Artistic License.
+This program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
 
 See http://dev.perl.org/licenses/ for more information.
 
