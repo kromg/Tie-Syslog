@@ -7,7 +7,7 @@ WriteMakefile(
     NAME                => 'Tie::Syslog',
     AUTHOR              => q{Giacomo Montagner <kromg@entirelyunlike.net>},
     VERSION_FROM        => 'lib/Tie/Syslog.pm',
-    ABSTRACT_FROM       => 'lib/Tie/Syslog.pm',
+    ABSTRACT_FROM       => 'lib/Tie/Syslog.pod',
     ($ExtUtils::MakeMaker::VERSION >= 6.3002
       ? ('LICENSE'=> 'perl')
       : ()),
