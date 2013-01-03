@@ -1,12 +1,13 @@
 package Tie::Syslog;
 
-$Tie::Syslog::VERSION = '2.03';
+$Tie::Syslog::VERSION = '2.03_fork-open_01';
 
 use 5.006;
 use strict;
 use warnings;
 use Carp qw/carp croak confess/;
 use Sys::Syslog qw/:standard :macros/;
+use POSIX;
 
 # ------------------------------------------------------------------------------
 # Define all default handle-tying subs, so that they can be autoloaded if 
@@ -44,6 +45,7 @@ my %open_connections;
 # ------------------------------------------------------------------------------
 # 'Private' functions
 # ------------------------------------------------------------------------------
+#   Should I avoid mixing OO and procedural interfaces? 
 
 ########################
 # sub _parse_config(@) #
@@ -93,6 +95,66 @@ sub _parse_config(@) {
     }
 
     return $params;
+}
+
+# ------------------------------------------------------------------------------
+# 'Private' methods
+# ------------------------------------------------------------------------------
+
+#####################
+# sub _spawn_writer_child #
+#####################
+# This sub is executed only if user requested 'fork-open' feature. It's the code
+# executed by the spawned child process, that listens on its STDIN waiting for
+# input, and calls $self->PRINT() on every input line.
+
+sub _spawn_writer_child {
+    my $self = shift;
+    
+    {
+        # First-thing-first: we inherit *ALL* parent filehandles. We don't want
+        # them, so we close them all.
+        opendir PROCFH, "/proc/$$/fd"
+            or croak "Unable to read dir /proc/$$/fd";
+
+        my $highest_fd = (sort readdir PROCFH)[-1];
+
+        closedir PROCFH
+            or croak "Closedir failed on /proc/$$/fd";
+
+        for my $fd (3 .. $highest_fd) {
+            POSIX::close( $fd );
+        } 
+        my @fh;
+        for my $fd (3 .. $highest_fd) {
+            open my $myfh, '<', "$0"
+                or croak "Cannot reopen fd $fd";
+            push @fh, $myfh;
+            # Just in case $fd and real fd go out of sync: 
+            last if fileno( $myfh ) >= $highest_fd;
+        }
+        # All re-opened filehandles should be closed by perl when @fh goes out
+        # of scope. But just in case: 
+        for my $fh (@fh) {
+            next unless $fh;
+            print "Trying to close $fh -> ", fileno $fh, "\n";
+            CORE::close $fh
+                or croak "Cannot close filehandle $fh: $!";
+        }
+
+    }
+
+    # Whew! We finally got here... try to do the real work. 
+    # Did you realize we have NO connection to syslog? Even if we had it, 
+    # we closed it. Will this break things? Let's see...
+    $self->OPEN();
+
+    while (<STDIN>) {
+        $self->PRINT($_);
+    }
+
+    return 1;
+    
 }
 
 # ------------------------------------------------------------------------------
@@ -160,6 +222,21 @@ sub TIEHANDLE {
     for (@mandatory_opts) {
         croak "You must provide value for '$_' option"
             unless $self->{$_};
+    }
+
+    # If fork-open was requested, spawn a child that will read from a real
+    # filehandle and will forward messages to syslog via our $self->PRINT(). 
+    if ($self->{'fork_open'}) {
+        print "Trying to fork-open\n";
+        defined ($self->{'chldpid'} = open($self->{'fh'}, '|-'))
+            or croak "Cannot fork: $!"; 
+        { 
+            my $prev = select $self->{'fh'};
+            ++$|;
+            select $prev;
+        }
+        $self->_spawn_writer_child
+            unless $self->{'chldpid'};
     }
 
     # Now openlog() if needed, by calling our own open()
@@ -244,7 +321,7 @@ sub WRITE {
 # by us. In other words, we have to try and guess.
 sub FILENO {
     my $self = shift;
-    my $fd = fileno(*Sys::Syslog::SYSLOG);
+    my $fd = fileno($self->{'fh'}) || fileno(*Sys::Syslog::SYSLOG);
     return defined($fd) ? $fd  
         : $self->{'is_open'} ? -1 : undef;
 }
