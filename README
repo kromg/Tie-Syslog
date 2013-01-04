@@ -11,7 +11,6 @@ SYNOPSIS
 
     # Tie STDOUT to Syslog, so that every print()ed message will be logged
     tie *STDOUT, 'Tie::Syslog', {
-        logopt   => 'pid,ndelay',
         facility => 'LOG_LOCAL0',
         priority => 'LOG_INFO',
     };
