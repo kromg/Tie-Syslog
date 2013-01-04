@@ -1,6 +1,6 @@
 package Tie::Syslog;
 
-$Tie::Syslog::VERSION = '2.03.01';
+$Tie::Syslog::VERSION = '2.04.00';
 
 use 5.006;
 use strict;

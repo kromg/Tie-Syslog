@@ -7,7 +7,7 @@ Tie::Syslog - Tie a filehandle to Syslog.
 
 =head1 VERSION
 
-2.03.01
+2.04.00
 
 v2.00 is a complete rewrite of Tie::Syslog. If you used v1.x and something
 broke after upgrade, please report the problem back and I'll try to fix it 

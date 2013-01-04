@@ -1,5 +1,13 @@
 Revision history for Perl extension Tie::Syslog.
 
+2.04.00 Fri Jan  4 11:34:25 CET 2013
+    - Changed versioning scheme, so that I have a minor number to take
+      minor changes into account. Had to change version to 2.04 since
+      CPAN rejects 2.03.01 as being lower than 2.03. 
+
+2.03.01 Fri Jan  4 11:34:25 CET 2013
+    - Fixed an error in documentation.
+
 2.03  Update to this file and to Makefile.PL, including modules Carp and 
       Sys::Syslog as prerequisites.
 
