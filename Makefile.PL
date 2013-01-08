@@ -15,7 +15,7 @@ WriteMakefile(
     PREREQ_PM => {
         'Test::More' =>  0,
         'Carp'       =>  0,
-        'Sys::Syslog' => 0,
+        'Sys::Syslog' => 0.11,
     },
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean               => { FILES => 'Tie-Syslog-*' },

@@ -1,5 +1,9 @@
 Revision history for Perl extension Tie::Syslog.
 
+2.04.01 Tue Jan  8 14:08:49 CET 2013
+    - Explicitly added dependency from Sys::Syslog v0.11, where :macros
+      should be a valid export tag.
+
 2.04.00 Fri Jan  4 11:34:25 CET 2013
     - Changed versioning scheme, so that I have a minor number to take
       minor changes into account. Had to change version to 2.04 since
