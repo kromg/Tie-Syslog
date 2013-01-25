@@ -1,6 +1,6 @@
 package Tie::Syslog;
 
-$Tie::Syslog::VERSION = '2.04.01';
+$Tie::Syslog::VERSION = '2.04.02';
 
 use 5.006;
 use strict;
@@ -208,7 +208,7 @@ sub CLOSE {
 sub PRINT {
     my $self = shift;
     carp "Cannot PRINT to a closed filehandle!" unless $self->{'is_open'};
-    eval { syslog $self->facility."|".$self->priority, @_ };
+    eval { syslog $self->facility."|".$self->priority, "@_" };
     croak "PRINT failed with errors: $@"
         if $@;
 }

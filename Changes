@@ -1,5 +1,9 @@
 Revision history for Perl extension Tie::Syslog.
 
+2.04.02 Fri Jan 25 15:05:07 CET 2013
+    - PRINT must interpolate @_ into string or only the first element of
+      the list will be printed. Added "" around @_ in PRINT.
+
 2.04.01 Tue Jan  8 14:08:49 CET 2013
     - Explicitly added dependency from Sys::Syslog v0.11, where :macros
       should be a valid export tag.
